@@ -1,0 +1,9 @@
+Flask
+Flask-SQLAlchemy
+Flask-Cors
+insightface
+onnxruntime
+numpy
+opencv-python
+requests
+gunicorn

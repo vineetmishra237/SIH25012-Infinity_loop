@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Attendance System</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👤</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+    #video-feed {
+    transform: scaleX(1); 
+}
+        body { font-family: 'Inter', sans-serif; }
+        .tab-active { 
+            border-color: #3B82F6; 
+            color: #3B82F6; 
+            font-weight: 600;
+        }
+        .modal-enter {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+        .modal-enter-active {
+            opacity: 1;
+            transform: scale(1);
+            transition: all 0.2s ease-out;
+        }
+        .modal-leave-active {
+            opacity: 0;
+            transform: scale(0.95);
+            transition: all 0.2s ease-in;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 antialiased">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900 tracking-tight">Smart Attendance System</h1>
+            <p class="text-gray-600 mt-2 text-lg">Live RFID & Face Recognition Dashboard</p>
+        </header>
+
+        <!-- Tabs -->
+        <div class="mb-6 border-b border-gray-200">
+            <nav class="flex space-x-8 -mb-px" id="tabs">
+                <button data-target="live" class="py-4 px-1 border-b-2 font-medium text-lg tab-active">Live Attendance</button>
+                <button data-target="dashboard" class="py-4 px-1 border-b-2 font-medium text-lg border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Dashboard</button>
+                <button data-target="enroll" class="py-4 px-1 border-b-2 font-medium text-lg border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Enroll Student</button>
+                <button data-target="logs" class="py-4 px-1 border-b-2 font-medium text-lg border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">View Logs</button>
+            </nav>
+        </div>
+
+        <!-- Content Panes -->
+        <main id="tab-content">
+            <!-- Live Attendance Pane -->
+            <div id="live-pane" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 bg-white p-8 rounded-2xl shadow-lg">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800">Live Verification</h2>
+                    <div id="status-display" class="h-96 flex flex-col items-center justify-center bg-gray-100 rounded-lg text-center p-4 border border-gray-200">
+                        <!-- Initial status -->
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-lg">
+                    <h3 class="text-xl font-semibold mb-4 text-gray-800">Recent Activity</h3>
+                    <div id="recent-logs" class="space-y-3 max-h-96 overflow-y-auto">
+                        <!-- Logs will be injected here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Pane -->
+            <div id="dashboard-pane" class="hidden">
+                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-lg flex items-center justify-between"><div id="total-students-stat"></div><div class="text-blue-500 text-3xl">👨‍🎓</div></div>
+                    <div class="bg-white p-6 rounded-xl shadow-lg flex items-center justify-between"><div id="present-today-stat"></div><div class="text-green-500 text-3xl">✅</div></div>
+                    <div class="bg-white p-6 rounded-xl shadow-lg flex items-center justify-between"><div id="absent-today-stat"></div><div class="text-red-500 text-3xl">❌</div></div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-lg mt-8">
+                    <canvas id="attendanceChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Enrollment Pane -->
+            <div id="enroll-pane" class="hidden bg-white p-8 rounded-2xl shadow-lg max-w-2xl mx-auto">
+                 <h2 class="text-2xl font-bold text-gray-800 mb-6">Enroll New Student</h2>
+                <form id="enroll-form" class="space-y-6">
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700">Full Name</label>
+                        <input type="text" id="name" name="name" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                     <div>
+                        <label for="roll_number" class="block text-sm font-medium text-gray-700">Roll Number</label>
+                        <input type="text" id="roll_number" name="roll_number" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label for="rfid_uid" class="block text-sm font-medium text-gray-700">RFID UID (Scan card to populate)</label>
+                        <input type="text" id="rfid_uid" name="rfid_uid" required readonly class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 cursor-not-allowed">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Face Photo</label>
+                        <div class="mt-1 flex items-center space-x-4">
+                            <video id="enroll-webcam" class="w-48 h-36 bg-gray-200 rounded-md" autoplay playsinline></video>
+                            <canvas id="enroll-canvas" class="hidden"></canvas>
+                            <img id="enroll-preview" src="https://placehold.co/192x144/e2e8f0/94a3b8?text=Preview" class="w-48 h-36 rounded-md hidden">
+                            <button type="button" id="capture-btn" class="px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700">Capture</button>
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full py-3 px-4 bg-green-600 text-white font-semibold rounded-md shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">Enroll Student</button>
+                </form>
+                <!-- Div for showing enrollment feedback -->
+                <div id="enroll-feedback" class="mt-4 text-center font-medium"></div>
+            </div>
+
+            <!-- Logs Pane -->
+            <div id="logs-pane" class="hidden bg-white p-8 rounded-2xl shadow-lg">
+                <h3 class="text-xl font-semibold mb-4">Full Attendance History</h3>
+                <div class="overflow-auto max-h-[70vh]"><table class="w-full text-left"><thead class="bg-gray-50 sticky top-0"><tr><th class="p-3 font-medium">Student</th><th class="p-3 font-medium">Roll No.</th><th class="p-3 font-medium">Date</th><th class="p-3 font-medium">Time</th></tr></thead><tbody id="logs-table-body" class="divide-y divide-gray-200"></tbody></table></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Verification Modal -->
+    <div id="verify-modal" class="fixed inset-0 bg-black bg-opacity-60 items-center justify-center p-4 hidden">
+        <div id="modal-content" class="bg-white rounded-lg p-8 max-w-md w-full text-center modal-enter">
+            <h3 class="text-2xl font-bold mb-2">Verifying <span id="modal-student-name" class="text-blue-600"></span></h3>
+            <p class="text-gray-500 mb-4">Please look directly at the camera.</p>
+            <video id="webcam" class="w-full rounded-md" autoplay playsinline></video>
+            <canvas id="canvas" class="hidden"></canvas>
+            <div id="countdown" class="text-6xl font-bold my-4 text-blue-600">3</div>
+        </div>
+    </div>
+    
+    <script>
+        // --- Core Application Logic ---
+        const API_URL = 'http://localhost:5000';
+        let faceImageBlob = null;
+        let attendanceChart = null;
+
+        // --- Tab Navigation ---
+        const tabs = document.getElementById('tabs');
+        const content = document.getElementById('tab-content');
+        tabs.addEventListener('click', e => {
+            if (e.target.tagName !== 'BUTTON') return;
+            const targetPane = e.target.dataset.target;
+
+            tabs.querySelectorAll('button').forEach(btn => btn.classList.remove('tab-active'));
+            e.target.classList.add('tab-active');
+            
+            content.querySelectorAll('div[id$="-pane"]').forEach(pane => pane.classList.add('hidden'));
+            document.getElementById(`${targetPane}-pane`).classList.remove('hidden');
+            
+            if (targetPane === 'dashboard') fetchDashboardData();
+            if (targetPane === 'logs') fetchAllLogs();
+            if (targetPane === 'enroll') startEnrollWebcam();
+            else stopEnrollWebcam();
+        });
+
+        // --- Real-time Event Listener for RFID Scans ---
+        function initializeEventSource() {
+            const eventSource = new EventSource(`${API_URL}/api/stream`);
+            eventSource.onmessage = event => {
+                const data = JSON.parse(event.data);
+                console.log('SSE Received:', data);
+                
+                const currentPane = document.querySelector('#tabs .tab-active').dataset.target;
+                if (currentPane === 'live') {
+                    if (data.status === 'unregistered') {
+                        updateStatusDisplay('unregistered', data.uid);
+                    } else {
+                        startVerificationProcess(data);
+                    }
+                } else if (currentPane === 'enroll') {
+                    document.getElementById('rfid_uid').value = data.uid;
+                }
+            };
+            eventSource.onerror = () => {
+                console.error("EventSource failed. Will attempt to reconnect.");
+                eventSource.close();
+                setTimeout(initializeEventSource, 3000);
+            };
+        }
+
+        // --- Verification Process ---
+        const verifyModal = document.getElementById('verify-modal');
+        const modalContent = document.getElementById('modal-content');
+        const webcam = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const countdownEl = document.getElementById('countdown');
+
+        async function startVerificationProcess({ uid, name }) {
+            document.getElementById('modal-student-name').textContent = name;
+            verifyModal.style.display = 'flex';
+            modalContent.classList.add('modal-enter-active');
+
+            try {
+                webcam.srcObject = await navigator.mediaDevices.getUserMedia({ video: true });
+            } catch (err) {
+                updateStatusDisplay('error', 'Webcam access denied.');
+                closeModal();
+                return;
+            }
+
+            let count = 3;
+            countdownEl.textContent = count;
+            const interval = setInterval(() => {
+                count--;
+                countdownEl.textContent = count > 0 ? count : '📸';
+                if (count <= 0) {
+                    clearInterval(interval);
+                    captureAndVerify(uid);
+                }
+            }, 1000);
+        }
+
+        function captureAndVerify(uid) {
+            canvas.width = webcam.videoWidth;
+            canvas.height = webcam.videoHeight;
+            canvas.getContext('2d').drawImage(webcam, 0, 0, canvas.width, canvas.height);
+            closeModal();
+            
+            canvas.toBlob(async blob => {
+                const formData = new FormData();
+                formData.append('rfid_uid', uid);
+                formData.append('live_image', blob, 'live.jpg');
+
+                updateStatusDisplay('verifying');
+
+                try {
+                    const response = await fetch(`${API_URL}/api/verify_attendance`, { method: 'POST', body: formData });
+                    const result = await response.json();
+                    
+                    if (response.status === 200 || response.status === 208) { // OK or Already Reported
+                        updateStatusDisplay('success', result.reason, result.student_name);
+                    } else {
+                        updateStatusDisplay('fail', result.reason, result.student_name);
+                    }
+                    fetchRecentLogs();
+                } catch (error) {
+                    updateStatusDisplay('error', 'Could not connect to server.');
+                }
+            }, 'image/jpeg');
+        }
+
+        function closeModal() {
+            modalContent.classList.remove('modal-enter-active');
+            setTimeout(() => {
+                if (webcam.srcObject) {
+                    webcam.srcObject.getTracks().forEach(track => track.stop());
+                }
+                verifyModal.style.display = 'none';
+            }, 200);
+        }
+
+        // --- UI Updates ---
+        function updateStatusDisplay(status, message = '', studentName = '') {
+            const display = document.getElementById('status-display');
+            let content = '';
+             switch(status) {
+                case 'success':
+                    content = `<div class="text-center text-green-600"><svg class="w-24 h-24 mx-auto" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg><h3 class="text-3xl font-bold mt-4">Verified</h3><p class="text-lg mt-1">${message}</p></div>`;
+                    break;
+                case 'fail':
+                     content = `<div class="text-center text-red-600"><svg class="w-24 h-24 mx-auto" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg><h3 class="text-3xl font-bold mt-4">Verification Failed</h3><p class="text-lg mt-1">${studentName}: ${message}</p></div>`;
+                    break;
+                 case 'unregistered':
+                    content = `<div class="text-center text-yellow-600"><svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><h3 class="text-2xl font-semibold mt-4">Unregistered Card</h3><p class="text-gray-600 mt-1 font-mono">${message}</p></div>`;
+                    break;
+                case 'verifying':
+                    content = `<div class="text-center"><div class="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto"></div><h3 class="text-2xl font-semibold mt-4">Verifying...</h3></div>`;
+                    break;
+                case 'error':
+                     content = `<div class="text-center text-red-600"><h3 class="text-2xl font-semibold">Error</h3><p class="mt-1">${message}</p></div>`;
+                     break;
+                 default: // waiting
+                     content = `<div class="text-center text-gray-700"><svg class="w-16 h-16 text-gray-400 mb-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.79-2.93 9.563M12 11v6m0 0v6m0-6h6m-6 0H6"></path></svg><h3 class="text-xl font-semibold">Waiting for RFID scan...</h3><p class="text-gray-500 mt-1">Please scan a card on the RFID reader.</p></div>`;
+            }
+            display.innerHTML = content;
+        }
+
+        async function fetchRecentLogs() {
+            try {
+                const response = await fetch(`${API_URL}/api/attendance`);
+                const logs = await response.json();
+                const container = document.getElementById('recent-logs');
+                if (logs.length === 0) {
+                    container.innerHTML = `<p class="text-gray-500">No activity yet today.</p>`;
+                    return;
+                }
+                container.innerHTML = logs.slice(0, 10).map(log => {
+                    const time = new Date(log.timestamp).toLocaleTimeString();
+                    return `<div class="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50"><p class="font-medium text-gray-700">${log.student_name}</p><p class="text-sm text-gray-500">${time}</p></div>`
+                }).join('');
+            } catch(e) { console.error("Failed to fetch recent logs:", e); }
+        }
+
+        // --- Enrollment Logic ---
+        const enrollWebcam = document.getElementById('enroll-webcam');
+        const enrollFeedback = document.getElementById('enroll-feedback');
+        let enrollStream = null;
+
+        async function startEnrollWebcam() {
+            try {
+                if (!enrollStream) {
+                    enrollStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    enrollWebcam.srcObject = enrollStream;
+                }
+            } catch (err) {
+                 enrollFeedback.innerHTML = `<p class="text-red-600">Could not access webcam. Please grant permission.</p>`;
+            }
+        }
+
+        function stopEnrollWebcam() {
+            if (enrollStream) {
+                enrollStream.getTracks().forEach(track => track.stop());
+                enrollStream = null;
+            }
+        }
+
+        document.getElementById('capture-btn').addEventListener('click', () => {
+            const canvas = document.getElementById('enroll-canvas');
+            const preview = document.getElementById('enroll-preview');
+            canvas.width = enrollWebcam.videoWidth;
+            canvas.height = enrollWebcam.videoHeight;
+            canvas.getContext('2d').drawImage(enrollWebcam, 0, 0, canvas.width, canvas.height);
+            preview.src = canvas.toDataURL('image/jpeg');
+            preview.classList.remove('hidden');
+            canvas.toBlob(blob => { faceImageBlob = blob; }, 'image/jpeg');
+        });
+
+        document.getElementById('enroll-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            enrollFeedback.innerHTML = ''; // Clear previous feedback
+            if (!faceImageBlob) {
+                enrollFeedback.innerHTML = `<p class="text-yellow-600">Please capture a face photo first.</p>`;
+                return;
+            }
+            const formData = new FormData(e.target);
+            formData.append('face_image', faceImageBlob, 'enroll.jpg');
+
+            try {
+                const response = await fetch(`${API_URL}/api/enroll`, { method: 'POST', body: formData });
+                const result = await response.json();
+                if (response.ok) {
+                    enrollFeedback.innerHTML = `<p class="text-green-600">${result.message}</p>`;
+                    e.target.reset();
+                    document.getElementById('enroll-preview').classList.add('hidden');
+                    faceImageBlob = null;
+                } else {
+                    enrollFeedback.innerHTML = `<p class="text-red-600">Error: ${result.error}</p>`;
+                }
+            } catch (error) {
+                enrollFeedback.innerHTML = `<p class="text-red-600">A network error occurred. Is the server running?</p>`;
+                console.error("Enrollment error:", error);
+            }
+        });
+
+        // --- Dashboard & Logs Logic ---
+        async function fetchDashboardData() {
+            const response = await fetch(`${API_URL}/api/attendance/summary`);
+            const data = await response.json();
+            
+            document.getElementById('total-students-stat').innerHTML = `<p class="text-2xl font-bold">${data.total_students}</p><p class="text-gray-500">Total Students</p>`;
+            document.getElementById('present-today-stat').innerHTML = `<p class="text-2xl font-bold">${data.present_today}</p><p class="text-gray-500">Present Today</p>`;
+            document.getElementById('absent-today-stat').innerHTML = `<p class="text-2xl font-bold">${data.absent_today}</p><p class="text-gray-500">Absent Today</p>`;
+            
+            const ctx = document.getElementById('attendanceChart').getContext('2d');
+            if (attendanceChart) attendanceChart.destroy();
+            attendanceChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Present', 'Absent'],
+                    datasets: [{
+                        data: [data.present_today, data.absent_today],
+                        backgroundColor: ['#10B981', '#EF4444'],
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { position: 'top' }, title: { display: true, text: "Today's Attendance" } } }
+            });
+        }
+        
+        async function fetchAllLogs() {
+            const response = await fetch(`${API_URL}/api/attendance`);
+            const logs = await response.json();
+            const tbody = document.getElementById('logs-table-body');
+            tbody.innerHTML = logs.map(log => {
+                const dt = new Date(log.timestamp);
+                return `<tr>
+                    <td class="p-3">${log.student_name}</td>
+                    <td class="p-3">${log.student_roll_number}</td>
+                    <td class="p-3">${dt.toLocaleDateString()}</td>
+                    <td class="p-3">${dt.toLocaleTimeString()}</td>
+                </tr>`;
+            }).join('');
+        }
+        
+        // --- Init ---
+        document.addEventListener('DOMContentLoaded', () => {
+            updateStatusDisplay('waiting');
+            initializeEventSource();
+            fetchRecentLogs();
+        });
+    </script>
+</body>
+</html>
+
